@@ -145,14 +145,14 @@ assert.ok(journal3.includes('crash-detected'), 'journal 应含 crash-detected')
       // 形状闸（可移植）：三工具定义必须含 output.schema(object) + output.render(fn)——
       // 与真实校验器 throw 条件一一对应（register 前 try/catch 计数用同一形状）
       const src = readFileSync(join(ROOT, 'index.js'), 'utf8')
-      const defCount = (src.match(/output: \{\n\s+schema:/g) || []).length
+      const defCount = (src.match(/output: \{\r?\n\s+schema:/g) || []).length
       assert.equal(defCount, 3, '三个 agent 工具都必须声明 output.schema（E1）')
       assert.ok(/render: \(args, value\)/.test(src), 'output.render 缺失——真实校验器将 throw')
       void svc
     } catch (e) { void e }
   } else {
     const src = readFileSync(join(ROOT, 'index.js'), 'utf8')
-    const defCount = (src.match(/output: \{\n\s+schema:/g) || []).length
+    const defCount = (src.match(/output: \{\r?\n\s+schema:/g) || []).length
     assert.equal(defCount, 3, '三个 agent 工具都必须声明 output.schema（E1）')
   }
 }
