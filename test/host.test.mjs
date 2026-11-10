@@ -172,7 +172,7 @@ assert.ok(journal3.includes('crash-detected'), 'journal 应含 crash-detected')
 // 12. E6：pendingBaseline 全链路（预置 state → apply → 补拍 + 清标记）——
 // P1-05 曾因同步返回值被当 Promise 而永远失败且被静默吞掉
 {
-  const k = await import(pathToFileURL(join('E:', 'AI', 'Projects', 'dsh-snap', 'cli', 'dsh-snap.mjs')).href)
+  const k = await import(pathToFileURL(join(ROOT, 'cli', 'dsh-snap.mjs')).href)
   const stFile = join(store, `harness-state-desktop.json`)
   const fp = { harnessDeps: JSON.stringify({ 'base-pkg': '1.0.0' }), runtime: 'test-runtime', app: 'test-app' }
   k.saveHarnessState(dshHome, { name: 'desktop', dir: fakeProfile }, store, fp, { pendingBaseline: true })
