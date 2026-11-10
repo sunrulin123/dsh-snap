@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 
 const tmp = join(tmpdir(), `dsh-snap-host-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
 const fakeProfile = join(tmp, 'profiles', 'desktop')
