@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+
+# Build artifacts & package tarballs
+*.tgz
+
+# Local snapshot stores & test output
+.dsh-snap/
+.dsh-snap-*/
+
+# OS junk (Windows / macOS)
+Thumbs.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment / secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+
+# Local research / private material (defense in depth: private notes,
+# decompiled host output and marketing drafts must never be published)
+tmp-asar/
+.research-tmp/
+marketing/
+
+# Private maintenance/audit records (local work journals)
+MAINTENANCE-*.md
+audit-*-report.md
+review-*-report.md
+shim/

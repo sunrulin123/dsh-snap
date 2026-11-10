@@ -1,0 +1,9 @@
+# 只把 Host 半侧挂进当前 profile；Web 半侧由 package.json 的 dsh.client 声明。
+- insert:
+    - id: dsh-snap
+      name: dsh-snap
+      config:
+        snapshotOnInstall: true
+        manifestOnlyForToggles: true
+        baselineOnBoot: true
+        watchCli: true

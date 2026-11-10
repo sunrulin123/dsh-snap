@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # 全矩阵留给 ubuntu（捕捉路径分隔符/大小写差异）；win/mac 各跑一个版本
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [20, 22]
+        exclude:
+          - { os: windows-latest, node: 22 }
+          - { os: macos-latest, node: 22 }
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm run check
+      - run: npm test
+      - name: pack manifest check
+        shell: bash
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e '
+            const files = JSON.parse(require("fs").readFileSync("pack.json", "utf8"))[0].files.map(f => f.path);
+            const need = ["index.js", "cli/dsh-snap.mjs", "client/index.js", "cordis.patch.yml", "README.md", "LICENSE"];
+            const missing = need.filter(f => !files.includes(f));
+            if (missing.length) { console.error("pack 缺文件:", missing); process.exit(1); }
+            const leak = files.filter(f => f.includes("test/") || f.includes("locale/"));
+            if (leak.length) { console.error("pack 泄漏:", leak); process.exit(1); }
+            console.log("pack 检查通过:", files.join(", "));
+          '
+

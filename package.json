@@ -1,0 +1,72 @@
+{
+  "name": "dsh-snap",
+  "version": "0.7.4",
+  "type": "module",
+  "description": "装插件搞崩，一键回到装前。装插件/首装事件自动快照 + 崩溃检测 + 外部零依赖 CLI 一键还原；危险项只报告不动手。",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "cordis",
+    "snapshot",
+    "restore",
+    "rollback",
+    "checkpoint",
+    "stability",
+    "recovery"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sunrulin123/dsh-snap.git"
+  },
+  "homepage": "https://github.com/sunrulin123/dsh-snap#readme",
+  "bugs": {
+    "url": "https://github.com/sunrulin123/dsh-snap/issues"
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.0-0 <0.3.0"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./cli": "./cli/dsh-snap.mjs",
+    "./client": "./client/index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "dsh-snap": "cli/dsh-snap.mjs"
+  },
+  "files": [
+    "index.js",
+    "cli/dsh-snap.mjs",
+    "client/index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "node --check index.js && node --check cli/dsh-snap.mjs && node --check client/index.js",
+    "test": "node cli/dsh-snap.mjs selftest && node test/host.test.mjs && node test/community-issues.test.mjs"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": ">=0.1.6-0 <0.3.0",
+    "@deepseek-ai/dsh-commands": ">=0.1.6-0 <0.3.0",
+    "@deepseek-ai/dsh-client-connection": ">=0.1.6-0 <0.3.0",
+    "@deepseek-ai/dsh-client-locale": ">=0.1.6-0 <0.3.0"
+  }
+}

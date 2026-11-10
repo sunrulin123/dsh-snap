@@ -1,0 +1,29 @@
+name: 💡 Feature request / 功能建议
+description: 提议新功能或行为改动
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        dsh-snap 的设计哲学是**克制**：危险项只报告不动手、还原必须可撤销、不碰会话与工作区。
+        建议先读 [CONTRIBUTING.md](../../blob/main/CONTRIBUTING.md) 的设计约定，说明你的提议与它的相容性。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决的问题 / Problem
+      description: 你遇到的具体场景，而不是解决方案本身
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案 / Proposed solution
+    validations:
+      required: true
+  - type: checkboxes
+    id: restraint
+    attributes:
+      label: 克制语义自检 / Restraint check
+      options:
+        - label: 该功能不会自动执行破坏性操作（删除/覆盖前有 guard 备份，失败会中止）
+          required: true

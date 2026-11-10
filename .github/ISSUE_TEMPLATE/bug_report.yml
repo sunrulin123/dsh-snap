@@ -1,0 +1,57 @@
+name: 🐞 Bug report / Bug 反馈
+description: dsh-snap 出了问题 — 快照、还原、崩溃归因、面板
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告问题！dsh-snap 是社区非官方项目。
+        **安全问题请勿在此公开** — 见 [SECURITY.md](../../blob/main/SECURITY.md)。
+        贴日志/manifest 片段前，请检查是否含 API key 等敏感信息。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么 / What happened?
+      description: 期望行为 vs 实际行为
+      placeholder: 还原后 X 插件丢失 / 快照失败报错 …
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      placeholder: |
+        1. 装了什么插件、怎么装的（agent / Web 页 / CLI）
+        2. 执行了什么命令
+        3. 看到什么输出
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 诊断输出 / Diagnostics
+      description: 以下命令的输出（最有帮助）：`node <store>/cli/dsh-snap.mjs doctor` 与 `crash --hours 48`
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: dsh-snap 版本 / version
+      description: store 里 `kernel-version.json` 的内容，或 `node <store>/cli/dsh-snap.mjs state`
+      placeholder: 0.7.4
+    validations:
+      required: true
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH 版本 / DSH version
+      placeholder: 0.2.2-rc.1
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统 / OS
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
