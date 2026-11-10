@@ -40,7 +40,9 @@ const ctx = {
   get(key) { return key === 'tools' ? { register: (t) => { tools.push(t.name); return () => {} } } : undefined },
 }
 
-const pluginUrl = pathToFileURL(join('E:', 'AI', 'Projects', 'dsh-snap', 'index.js')).href
+// ROOT 从本文件位置推导（曾硬编码 E:/AI/Projects/dsh-snap——换机/CI 即断）
+const ROOT = fileURLToPath(new URL('..', import.meta.url)).replace(/[\\/]+$/, '')
+const pluginUrl = pathToFileURL(join(ROOT, 'index.js')).href
 const { apply } = await import(pluginUrl)
 
 apply(ctx, { snapshotOnInstall: true })
@@ -142,14 +144,14 @@ assert.ok(journal3.includes('crash-detected'), 'journal 应含 crash-detected')
       }
       // 形状闸（可移植）：三工具定义必须含 output.schema(object) + output.render(fn)——
       // 与真实校验器 throw 条件一一对应（register 前 try/catch 计数用同一形状）
-      const src = readFileSync(join('E:', 'AI', 'Projects', 'dsh-snap', 'index.js'), 'utf8')
+      const src = readFileSync(join(ROOT, 'index.js'), 'utf8')
       const defCount = (src.match(/output: \{\n\s+schema:/g) || []).length
       assert.equal(defCount, 3, '三个 agent 工具都必须声明 output.schema（E1）')
       assert.ok(/render: \(args, value\)/.test(src), 'output.render 缺失——真实校验器将 throw')
       void svc
     } catch (e) { void e }
   } else {
-    const src = readFileSync(join('E:', 'AI', 'Projects', 'dsh-snap', 'index.js'), 'utf8')
+    const src = readFileSync(join(ROOT, 'index.js'), 'utf8')
     const defCount = (src.match(/output: \{\n\s+schema:/g) || []).length
     assert.equal(defCount, 3, '三个 agent 工具都必须声明 output.schema（E1）')
   }
