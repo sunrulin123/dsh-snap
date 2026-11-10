@@ -331,6 +331,7 @@ export function takeSnapshot(opts) {
     const src = join(profile.dir, f)
     if (existsNo(src)) {
       copyFileSync(src, join(dir, 'profile', f))
+      if (!IS_WIN) { try { const sst = statSync(src); utimesSync(join(dir, 'profile', f), sst.atime, sst.mtime) } catch { /* 尽力 */ } } // POSIX copy 不保留 mtime
       profileTaken.push(f)
       try {
         const keys = scanCredentialKeys(readFileSync(src, 'utf8'))
@@ -355,6 +356,7 @@ export function takeSnapshot(opts) {
         if (keys.length) { homeSkipped.push({ file: f, reason: 'credential-like', keys }); continue }
       } catch { /* 读不了按二进制处理，照常拷贝 */ }
       copyFileSync(src, join(dir, 'home', f))
+      if (!IS_WIN) { try { utimesSync(join(dir, 'home', f), st.atime, st.mtime) } catch { /* 尽力 */ } } // POSIX copy 不保留 mtime
       homeTaken.push(f)
     }
   }
@@ -491,11 +493,17 @@ export function snapshotNodeModules({ src, dest, prevIndex, prevNmDir, sameVol, 
         try {
           mkdirSync(dirname(rAbs), { recursive: true })
           if (sameVol && !privateCopy) { linkSync(sAbs, rAbs); linkedSource++ }
-          else { copyFileSync(sAbs, rAbs); copied++ } // 原地写文件/自目录强制私有副本，杜绝硬链接污染面
+          else {
+            copyFileSync(sAbs, rAbs); copied++ // 原地写文件/自目录强制私有副本，杜绝硬链接污染面
+            // Windows CopyFileW 保留源 mtime；POSIX copy 是读写循环，目标 mtime=now。
+            // 索引记录的是 live 的 size/mtime——非 Windows 必须把副本 mtime 对齐 live，
+            // 否则 verify 的 size+mtime 指纹永远漂移（CI 三平台实测）
+            if (!IS_WIN) { try { utimesSync(rAbs, st.atime, st.mtime) } catch { /* 尽力对齐 */ } }
+          }
           files++; bytes += st.size
           if (!hash) hash = safeSha256(sAbs) // 新内容实算（硬链接/复制后源与快照同内容）
         } catch {
-          try { copyFileSync(sAbs, rAbs); copied++; files++; bytes += st.size; hash = safeSha256(sAbs) }
+          try { copyFileSync(sAbs, rAbs); copied++; files++; bytes += st.size; if (!IS_WIN) { try { utimesSync(rAbs, st.atime, st.mtime) } catch { /* 尽力 */ } } hash = safeSha256(sAbs) }
           catch { complete = false; continue }
         }
       }
@@ -944,6 +952,7 @@ export function restoreSnapshot(opts) {
     if (!existsNo(src)) { results.reported.push({ path: f, issue: 'snapshot-file-missing' }); continue } // 曾静默跳过（nm 层同场景会报，两层不一致）
     if (existsNo(dst)) { try { copyFileSync(dst, join(trashBatch, f)) } catch { /* trash 失败不阻塞 */ } }
     copyFileSync(src, dst)
+    if (!IS_WIN) { try { const sst = statSync(src); utimesSync(dst, sst.atime, sst.mtime) } catch { /* 尽力 */ } } // POSIX copy 不保留 mtime
     results.profile.push(f)
   }
 
@@ -1017,7 +1026,11 @@ export function restoreSnapshot(opts) {
         // P2-2 修复：原地写文件/自目录的私有副本必须以「复制」回树——硬链接回填会
         // 把防污染设计拆掉（回填后 live 原地写又同步污染快照，审计实证）
         if (sameVolume(snapFile, nmCur) && !isInPlaceNmFile(rel) && !isPrivateCopyTop(rel)) linkSync(snapFile, dst)
-        else copyFileSync(snapFile, dst)
+        else {
+          copyFileSync(snapFile, dst)
+          // POSIX copy 不保留 mtime——回填后 verify 才能对上快照期指纹（同快照侧，见 snapshotNodeModules）
+          if (!IS_WIN) { try { const sst = lstatSync(snapFile); utimesSync(dst, sst.atime, sst.mtime) } catch { /* 尽力 */ } }
+        }
         results.restored++
       } catch (e) { results.reported.push({ path: rel, issue: 'restore-failed', error: String(e) }) }
     }
@@ -1049,6 +1062,7 @@ export function restoreSnapshot(opts) {
       if (!existsNo(src)) continue
       if (existsNo(dst)) { try { copyFileSync(dst, join(trashBatch, `home-${f}`)) } catch { /* trash 失败不阻塞 */ } }
       copyFileSync(src, dst)
+      if (!IS_WIN) { try { const sst = statSync(src); utimesSync(dst, sst.atime, sst.mtime) } catch { /* 尽力 */ } } // POSIX copy 不保留 mtime
       results.home.push(f)
     }
   }
@@ -2776,7 +2790,11 @@ export function selftest() {
     if (!skipped || skipped.reason !== 'credential-like') throw new Error(`凭据文件未被拦截：${JSON.stringify(m.layers.home.skipped)}`)
     if (existsNo(join(store, 'snapshots', m.id, 'home', 'settings.yaml'))) throw new Error('凭据文件被写进了快照！')
   })
-  t('store: 营救 bat 含 runtime node 兜底段（G3）', () => {
+  t('store: 营救 bat 含 runtime node 兜底段（G3，Windows）', () => {
+    if (!IS_WIN) { // 非 Windows 不生成 bat（ensureStoreSelfCopy 平台分支）；验 mjs 副本仍存在
+      if (!existsNo(join(store, 'cli', 'dsh-snap.mjs'))) throw new Error('非 Windows 也应有 CLI 副本')
+      return
+    }
     const bat = readFileSync(join(store, 'cli', 'dsh-snap.bat'), 'utf8')
     if (!bat.includes('DSHSNAP_NODE')) throw new Error('bat 缺 node 路径兜底逻辑')
   })
@@ -2968,18 +2986,27 @@ export function selftest() {
   })
   t('harness 哨兵: 指纹建档→变更检出→基线快照', () => {
     const storeF = join(tmp, '.dsh-snap-sentinel')
-    const fp1 = harnessFingerprint('E:/AI/Data/DSH', prof)
-    if (!fp1.harnessDeps && !fp1.app && !fp1.runtime) throw new Error('指纹全空（三策略全失败）')
+    // 跨平台可复现：给 fakeProfile 注入 @deepseek-ai 依赖 → harnessDeps 策略命中（策略①
+    // 不依赖 Windows 注册表/安装器——app/runtime 两策略仅 Windows 实机可得，CI 上为 null）
+    const mfSentinel = join(fakeProfile, 'package.json')
+    const savedMfSentinel = readFileSync(mfSentinel, 'utf8')
+    writeFileSync(mfSentinel, JSON.stringify({ dependencies: { '@deepseek-ai/dsh-desktop': '0.2.2-rc.1' } }))
+    const fp1 = harnessFingerprint(tmp, prof)
+    if (!fp1.harnessDeps) { writeFileSync(mfSentinel, savedMfSentinel); throw new Error(`指纹全空（harnessDeps 未命中）：${JSON.stringify(fp1)}`) }
+    try {
     // 建档
-    saveHarnessState('E:/AI/Data/DSH', prof, storeF, fp1)
-    const det1 = detectHarnessChange('E:/AI/Data/DSH', prof, storeF)
+    saveHarnessState(tmp, prof, storeF, fp1)
+    const det1 = detectHarnessChange(tmp, prof, storeF)
     if (det1.changed) throw new Error('刚建档即报变化')
-    // 模拟桌面版更新：指纹变化
-    const fp2 = { ...fp1, app: (fp1.app || 'x|1|1').replace(/(\d+)$/, '9999999999') }
-    saveHarnessState('E:/AI/Data/DSH', prof, storeF, fp2)
-    const det2 = detectHarnessChange('E:/AI/Data/DSH', prof, storeF)
+    // 模拟桌面版更新：指纹变化（若 app 为 null 则变 harnessDeps——策略①在 CI 也可驱动检出）
+    const fp2 = fp1.app
+      ? { ...fp1, app: fp1.app.replace(/(\d+)$/, '9999999999') }
+      : { ...fp1, harnessDeps: fp1.harnessDeps.replace('0.2.2-rc.1', '0.2.3') }
+    saveHarnessState(tmp, prof, storeF, fp2)
+    const det2 = detectHarnessChange(tmp, prof, storeF)
     if (!det2.changed) throw new Error('指纹变化未检出')
-    if (det2.from.app === det2.to.app) throw new Error('from/to 未区分')
+    if (det2.from.app === det2.to.app && det2.from.harnessDeps === det2.to.harnessDeps) throw new Error('from/to 未区分')
+    } finally { writeFileSync(join(fakeProfile, 'package.json'), savedMfSentinel) }
   })
   t('manifest 打标: harnessVersion 字段写入', () => {
     const storeG = join(tmp, '.dsh-snap-mark')
@@ -3155,7 +3182,8 @@ export function selftest() {
     rmSync(join(fakeProfile, 'cordis.patch.yml'), { force: true })
     rmSync(join(fakeProfile, bakName), { force: true })
   })
-  t('repair-gui: 外壳状态备份+重置（dry-run 不动文件，真执行后 shell 集清空）', () => {
+  t('repair-gui: 外壳状态备份+重置（dry-run 不动文件，真执行后 shell 集清空；Windows 实机面）', () => {
+    if (!IS_WIN) return // repair-gui 是 Windows 桌面外壳专用（非 Windows 结构化拒绝已由 audit P1-02/P2-04 测试覆盖）
     const shell = join(tmp, 'fake-gui-shell')
     mkdirSync(join(shell, 'Network'), { recursive: true })
     writeFileSync(join(shell, 'Local State'), '{"os_crypt":{}}')
@@ -3183,8 +3211,8 @@ export function selftest() {
     // 通过注入 fake probe 无法做到（函数未导出），改为直接断言三态语义：用 IS_WIN 恒真环境 + 真实 tasklist。
     // 这里验证的是「闸存在且三态语义正确」：ok=false 时 skipped 必须带理由。
     const g = repairGui({ shellDir: shell, store: storeA, dryRun: true, skipProcessGuard: false })
-    if (g.ok === false && !String(g.skipped?.[0] ?? '').match(/DeepSeek|tasklist/)) throw new Error(`拒绝缺理由：${JSON.stringify(g.skipped)}`)
-    if (g.busy === null && g.ok !== false) throw new Error('探测失败（busy=null）却放行——fail-open 回归！')
+    if (g.ok === false && !String(g.skipped?.[0] ?? '').match(/DeepSeek|tasklist|Windows/)) throw new Error(`拒绝缺理由：${JSON.stringify(g.skipped)}`)
+    if (g.busy === null && g.ok !== false && IS_WIN) throw new Error('探测失败（busy=null）却放行——fail-open 回归！')
     // P2-04：非 shellDir 注入时 APPDATA 必须存在（本机恒有）——只测 APPDATA 缺失分支的代码路径可达性：
     // 用临时清空 APPDATA + 显式不传 shellDir
     const savedAppdata = process.env.APPDATA
