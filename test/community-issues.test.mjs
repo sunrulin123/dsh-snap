@@ -89,8 +89,10 @@ await t('S2 长路径：深层嵌套包名快照与还原', () => {
 
 /* ---- S3 跨卷 store（copy 降级路径）：home 与 store 必须在不同卷。
  * F2（0.7.4 审计）：曾硬编码 E:\AI\dsh-plugin-research\tmp——单卷机器/他机环境直接炸。
- * 可移植策略：优先 tmpdir 之外的卷（本机 tmpdir=C:、数据盘=E:），找不到第二卷则跳过（注明）。 */
+ * 可移植策略：盘符跨卷是 Windows 多盘现实；仅 win32 找第二盘符，
+ * POSIX 无第二卷概念（除非真挂载第二文件系统，CI 不具备）→ 跳过（注明）。 */
 const crossVolHome = (() => {
+  if (process.platform !== 'win32') return null
   const tmpRoot = tmpdir() // 形如 C:\Users\...\Temp
   const tmpDrive = tmpRoot.slice(0, 2).toLowerCase()
   for (const cand of ['E:', 'D:', 'F:']) {
@@ -222,11 +224,13 @@ await t('S8 只读 store：takeSnapshot 抛可读错误而非挂死', () => {
   try { chmodSync(store, 0o444) } catch { /* Windows chmod 受限时跳过断言 */ }
   let threw = null
   try { takeSnapshot({ store, profile: profOf(home), trigger: 'manual' }) } catch (e) { threw = e }
-  try { chmodSync(store, 0o666) } catch { /* 忽略 */ }
+  try { chmodSync(store, 0o777) } catch { /* 忽略 */ }
   if (process.platform === 'win32') {
     // Windows 上目录只读属性不阻止创建子目录（chmod 语义弱化）——能成功则视为通过，能抛错也算通过
     if (!threw) { /* OK：Windows 只读目录仍可写，无异常即通过 */ }
   } else if (!threw) throw new Error('POSIX 只读目录应抛错')
+  try { chmodSync(store, 0o777) } catch { /* 二次恢复（umask/ACL 宽松化） */ }
+  try { rmSync(join(store, 'blocker'), { force: true }) } catch { /* 恢复失败时尽力 */ }
   rmSync(home, { recursive: true, force: true })
 })
 
